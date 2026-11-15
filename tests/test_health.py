@@ -84,3 +84,28 @@ def test_database_session_isolation():
         next(gen)
     except StopIteration:
         pass
+
+
+def test_database_url_normalization_and_driver_selection():
+    """Verify database URLs are normalized to postgresql+psycopg2:// for SQLAlchemy 2.0."""
+    from app.database import normalize_database_url
+
+    # 1. Render default URL with postgres://
+    render_postgres_url = "postgres://carebridge_user:secret_pass@dpg-abc123-a.singapore-postgres.render.com/carebridge"
+    normalized_1 = normalize_database_url(render_postgres_url)
+    assert normalized_1 == "postgresql+psycopg2://carebridge_user:secret_pass@dpg-abc123-a.singapore-postgres.render.com/carebridge"
+
+    # 2. Render standard URL with postgresql://
+    render_postgresql_url = "postgresql://carebridge_user:secret_pass@dpg-abc123-a.singapore-postgres.render.com/carebridge"
+    normalized_2 = normalize_database_url(render_postgresql_url)
+    assert normalized_2 == "postgresql+psycopg2://carebridge_user:secret_pass@dpg-abc123-a.singapore-postgres.render.com/carebridge"
+
+    # 3. Already explicit postgresql+psycopg2://
+    explicit_url = "postgresql+psycopg2://carebridge_user:secret_pass@dpg-abc123-a.singapore-postgres.render.com/carebridge"
+    normalized_3 = normalize_database_url(explicit_url)
+    assert normalized_3 == explicit_url
+
+    # 4. Local SQLite URL
+    sqlite_url = "sqlite:///./carebridge.db"
+    normalized_4 = normalize_database_url(sqlite_url)
+    assert normalized_4 == "sqlite:///./carebridge.db"
