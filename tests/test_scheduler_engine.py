@@ -411,3 +411,169 @@ def test_audit_trail_and_api_persistence():
     client.cookies.clear()
     unauth_res = client.get(f"/api/adherence/senior/{senior_id}/audits")
     assert unauth_res.status_code == 401
+
+
+def test_asia_kolkata_schedule_timezone_regression():
+    """Regression test: Senior in Asia/Kolkata with medication scheduled for 18:00 must display as 6:00 PM on dashboard.
+
+    Verifies:
+    1. Underlying database MedicationLog.scheduled_for persists UTC timestamp (12:30:00).
+    2. Adherence API (/api/adherence/senior/{id}/today) converts UTC to senior timezone (18:00:00+05:30).
+    3. Senior Dashboard (/senior) displays '6:00 PM' and does not display raw UTC '12:30 PM'.
+    4. Dose remains pending without unauthorized status mutation (never marked taken or skipped).
+    """
+    client.cookies.clear()
+
+    # 1. Register Senior
+    reg_res = client.post(
+        "/api/auth/register-senior",
+        json={"full_name": "Aarav Sharma", "passcode": "5566"},
+    )
+    assert reg_res.status_code == 201
+    senior_id = reg_res.json()["id"]
+
+    # 2. Login as Senior
+    login_res = client.post(
+        "/api/auth/login-passcode",
+        json={"user_id": senior_id, "passcode": "5566"},
+    )
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 3. Configure Senior Profile Timezone as Asia/Kolkata
+    prof_res = client.put(
+        "/api/profile/me",
+        headers=headers,
+        json={"timezone": "Asia/Kolkata"},
+    )
+    assert prof_res.status_code == 200
+    assert prof_res.json()["timezone"] == "Asia/Kolkata"
+
+    # 4. Create Medication with schedule 18:00
+    med_res = client.post(
+        "/api/medications",
+        headers=headers,
+        json={
+            "name": "Metformin XR",
+            "dosage": "500 mg",
+            "instructions": "Take with dinner",
+            "schedules": [
+                {"scheduled_time": "18:00", "days_of_week": "everyday", "timezone": "Asia/Kolkata"}
+            ],
+        },
+    )
+    assert med_res.status_code == 201
+
+    # 5. Fetch today's doses via adherence API
+    today_res = client.get(f"/api/adherence/senior/{senior_id}/today", headers=headers)
+    assert today_res.status_code == 200
+    doses = today_res.json()
+    assert len(doses) == 1
+    dose = doses[0]
+    assert dose["status"] == "pending"
+
+    # Verify API returned local scheduled time has hour 18, minute 0
+    parsed_sched = datetime.fromisoformat(dose["scheduled_for"])
+    assert parsed_sched.hour == 18
+    assert parsed_sched.minute == 0
+
+    # 6. Verify UTC storage in database (18:00 Asia/Kolkata -> 12:30 UTC)
+    with SessionLocal() as db:
+        log = db.query(MedicationLog).filter(MedicationLog.senior_id == senior_id).first()
+        assert log is not None
+        assert log.scheduled_for.hour == 12
+        assert log.scheduled_for.minute == 30
+        assert log.status == "pending"
+        assert log.taken_at is None
+
+    # 7. Verify Senior Dashboard rendering
+    dash_res = client.get("/senior")
+    assert dash_res.status_code == 200
+    assert "6:00 PM" in dash_res.text
+    assert "12:30 PM" not in dash_res.text
+    assert "Metformin XR" in dash_res.text
+
+    # Re-verify database dose was not mutated by dashboard access
+    with SessionLocal() as db:
+        log_after = db.query(MedicationLog).filter(MedicationLog.senior_id == senior_id).first()
+        assert log_after.status == "pending"
+        assert log_after.taken_at is None
+
+
+def test_utc_schedule_timezone_regression():
+    """Regression test: Senior in UTC with medication scheduled for 18:00 displays as 6:00 PM."""
+    client.cookies.clear()
+
+    # 1. Register Senior
+    reg_res = client.post(
+        "/api/auth/register-senior",
+        json={"full_name": "Oliver Twist", "passcode": "1122"},
+    )
+    assert reg_res.status_code == 201
+    senior_id = reg_res.json()["id"]
+
+    # 2. Login as Senior
+    login_res = client.post(
+        "/api/auth/login-passcode",
+        json={"user_id": senior_id, "passcode": "1122"},
+    )
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 3. Configure Senior Profile Timezone as UTC
+    prof_res = client.put(
+        "/api/profile/me",
+        headers=headers,
+        json={"timezone": "UTC"},
+    )
+    assert prof_res.status_code == 200
+    assert prof_res.json()["timezone"] == "UTC"
+
+    # 4. Create Medication with schedule 18:00 UTC
+    med_res = client.post(
+        "/api/medications",
+        headers=headers,
+        json={
+            "name": "Lisinopril",
+            "dosage": "10 mg",
+            "instructions": "Take in evening",
+            "schedules": [
+                {"scheduled_time": "18:00", "days_of_week": "everyday", "timezone": "UTC"}
+            ],
+        },
+    )
+    assert med_res.status_code == 201
+
+    # 5. Fetch today's doses via adherence API
+    today_res = client.get(f"/api/adherence/senior/{senior_id}/today", headers=headers)
+    assert today_res.status_code == 200
+    doses = today_res.json()
+    assert len(doses) == 1
+    assert doses[0]["status"] == "pending"
+
+    parsed_sched = datetime.fromisoformat(doses[0]["scheduled_for"])
+    assert parsed_sched.hour == 18
+    assert parsed_sched.minute == 0
+
+    # 6. Verify UTC storage in database (18:00 UTC -> 18:00 UTC)
+    with SessionLocal() as db:
+        log = db.query(MedicationLog).filter(MedicationLog.senior_id == senior_id).first()
+        assert log is not None
+        assert log.scheduled_for.hour == 18
+        assert log.scheduled_for.minute == 0
+        assert log.status == "pending"
+        assert log.taken_at is None
+
+    # 7. Verify Senior Dashboard rendering
+    dash_res = client.get("/senior")
+    assert dash_res.status_code == 200
+    assert "6:00 PM" in dash_res.text
+    assert "Lisinopril" in dash_res.text
+
+    # Re-verify database dose was not mutated
+    with SessionLocal() as db:
+        log_after = db.query(MedicationLog).filter(MedicationLog.senior_id == senior_id).first()
+        assert log_after.status == "pending"
+        assert log_after.taken_at is None

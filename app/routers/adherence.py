@@ -1,5 +1,6 @@
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timezone
 from typing import List, Optional
+from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -7,23 +8,58 @@ from app.database import get_db
 from app.models import Medication, MedicationSchedule, MedicationLog, User, MedicationStatusAudit
 from app.schemas import DoseActionRequest, DoseLogResponse, AdherenceStats, MedicationStatusAuditResponse
 from app.services.auth_service import get_current_user, verify_senior_access
-from app.services.scheduler_service import SchedulerService
+from app.services.scheduler_service import SchedulerService, get_safe_timezone
 
 adherence_router = APIRouter(prefix="/api/adherence", tags=["Adherence Tracking"])
 
 
-def _format_dose_log_response(log: MedicationLog, db: Session) -> DoseLogResponse:
+def _format_dose_log_response(
+    log: MedicationLog,
+    db: Session,
+    target_tz: Optional[ZoneInfo] = None,
+) -> DoseLogResponse:
+    if target_tz is None:
+        senior = (
+            log.senior
+            if hasattr(log, "senior") and log.senior
+            else db.query(User).filter(User.id == log.senior_id).first()
+        )
+        tz_name = (
+            senior.profile.timezone
+            if (senior and senior.profile and senior.profile.timezone)
+            else "UTC"
+        )
+        target_tz = get_safe_timezone(tz_name)
+
+    # Convert UTC scheduled_for to senior's target timezone
+    scheduled_for = log.scheduled_for
+    if scheduled_for:
+        if scheduled_for.tzinfo is None:
+            scheduled_for = scheduled_for.replace(tzinfo=timezone.utc)
+        scheduled_for = scheduled_for.astimezone(target_tz)
+
+    # Convert UTC taken_at to senior's target timezone if present
+    taken_at = log.taken_at
+    if taken_at:
+        if taken_at.tzinfo is None:
+            taken_at = taken_at.replace(tzinfo=timezone.utc)
+        taken_at = taken_at.astimezone(target_tz)
+
     med = log.medication
-    confirmed_by_user = db.query(User).filter(User.id == log.confirmed_by_user_id).first() if log.confirmed_by_user_id else None
+    confirmed_by_user = (
+        db.query(User).filter(User.id == log.confirmed_by_user_id).first()
+        if log.confirmed_by_user_id
+        else None
+    )
     return DoseLogResponse(
         id=log.id,
         medication_id=log.medication_id,
         medication_name=med.name if med else "Unknown",
         dosage=med.dosage if med else "",
         senior_id=log.senior_id,
-        scheduled_for=log.scheduled_for,
+        scheduled_for=scheduled_for,
         status=log.status,
-        taken_at=log.taken_at,
+        taken_at=taken_at,
         reminder_sent=log.reminder_sent,
         reminder_sent_at=log.reminder_sent_at,
         confirmed_by_user_id=log.confirmed_by_user_id,
@@ -42,26 +78,33 @@ def get_or_generate_today_doses(
     """Retrieve today's medication doses for a senior, initializing pending doses without duplicates."""
     verify_senior_access(db, current_user, senior_id, required_permission="can_log_adherence")
 
-    # Generate any missing scheduled doses for today
-    SchedulerService.generate_scheduled_doses(db, target_date=date.today(), senior_id=senior_id)
+    senior = db.query(User).filter(User.id == senior_id).first()
+    tz_name = senior.profile.timezone if (senior and senior.profile and senior.profile.timezone) else "UTC"
+    senior_tz = get_safe_timezone(tz_name)
+    local_today = datetime.now(senior_tz).date()
 
-    today = date.today()
-    start_of_day = datetime.combine(today, time.min)
-    end_of_day = datetime.combine(today, time.max)
+    # Generate any missing scheduled doses for senior's local today
+    SchedulerService.generate_scheduled_doses(db, target_date=local_today, senior_id=senior_id)
 
-    # Query all doses for today
+    # Compute UTC bounds corresponding to senior's local start and end of day
+    local_start = datetime.combine(local_today, time.min, tzinfo=senior_tz)
+    local_end = datetime.combine(local_today, time.max, tzinfo=senior_tz)
+    utc_start = local_start.astimezone(timezone.utc).replace(tzinfo=None)
+    utc_end = local_end.astimezone(timezone.utc).replace(tzinfo=None)
+
+    # Query all doses for today within the UTC window
     today_logs = (
         db.query(MedicationLog)
         .filter(
             MedicationLog.senior_id == senior_id,
-            MedicationLog.scheduled_for >= start_of_day,
-            MedicationLog.scheduled_for <= end_of_day,
+            MedicationLog.scheduled_for >= utc_start,
+            MedicationLog.scheduled_for <= utc_end,
         )
         .order_by(MedicationLog.scheduled_for.asc())
         .all()
     )
 
-    return [_format_dose_log_response(log, db) for log in today_logs]
+    return [_format_dose_log_response(log, db, target_tz=senior_tz) for log in today_logs]
 
 
 @adherence_router.post("/logs/{log_id}/confirm", response_model=DoseLogResponse)
@@ -98,6 +141,10 @@ def get_adherence_history(
     """List historical dose logs for a senior with audit information."""
     verify_senior_access(db, current_user, senior_id, required_permission="can_log_adherence")
 
+    senior = db.query(User).filter(User.id == senior_id).first()
+    tz_name = senior.profile.timezone if (senior and senior.profile and senior.profile.timezone) else "UTC"
+    senior_tz = get_safe_timezone(tz_name)
+
     logs = (
         db.query(MedicationLog)
         .filter(MedicationLog.senior_id == senior_id)
@@ -106,7 +153,7 @@ def get_adherence_history(
         .all()
     )
 
-    return [_format_dose_log_response(log, db) for log in logs]
+    return [_format_dose_log_response(log, db, target_tz=senior_tz) for log in logs]
 
 
 @adherence_router.get("/senior/{senior_id}/stats", response_model=AdherenceStats)
