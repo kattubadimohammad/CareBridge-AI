@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}CareBridge AI &mdash; Senior Care & Medication Platform{% endblock %}
+
+{% block content %}
+<section class="card" aria-labelledby="welcome-heading">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <span class="badge badge-info">{{ environment | upper }} MODE</span>
+      <h1 id="welcome-heading" style="margin-top: 0.5rem;">Welcome to CareBridge AI</h1>
+    </div>
+    <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);" aria-live="polite">
+      🕒 <span id="live-clock">--:--:--</span>
+    </div>
+  </div>
+  <p>
+    An intelligent, accessible platform bridging elderly medication routines, caregiver peace of mind, and proactive reminder escalations.
+  </p>
+</section>
+
+<div class="grid-2">
+  <section class="card" aria-labelledby="senior-heading">
+    <h2 id="senior-heading">👴 Senior Experience</h2>
+    <p>
+      Simple numeric passcode sign-in, ultra-large high-contrast buttons, and instant one-tap confirmation for scheduled medications.
+    </p>
+    <a href="/api/health" class="btn btn-primary" aria-label="Check System Health">
+      Check System Status
+    </a>
+  </section>
+
+  <section class="card" aria-labelledby="caregiver-heading">
+    <h2 id="caregiver-heading">👩‍⚕️ Caregiver & Family Portal</h2>
+    <p>
+      Real-time adherence monitoring, schedule configuration, and automated email alerts for overdue medications.
+    </p>
+    <a href="/docs" target="_blank" rel="noopener" class="btn btn-primary" aria-label="Explore API Documentation">
+      API Documentation
+    </a>
+  </section>
+</div>
+
+<section class="card" aria-labelledby="arch-heading">
+  <h2 id="arch-heading">⚙️ Platform Architecture</h2>
+  <ul style="padding-left: 1.5rem; line-height: 2;">
+    <li><strong>FastAPI Asynchronous Engine:</strong> Robust backend providing sub-second latency and OpenAPI contracts.</li>
+    <li><strong>Dual Database Support:</strong> Zero-friction SQLite for local testing and PostgreSQL for Cloud Run.</li>
+    <li><strong>Automated Cloud Reminders:</strong> Secure cron webhook endpoints ready for Cloud Scheduler triggers.</li>
+    <li><strong>Role-Based Security:</strong> Strict separation of roles with salted bcrypt passcode hashing.</li>
+  </ul>
+</section>
+{% endblock %}

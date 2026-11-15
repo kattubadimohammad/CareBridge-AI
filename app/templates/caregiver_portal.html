@@ -1,0 +1,445 @@
+{% extends "base.html" %}
+
+{% block title %}Caregiver Portal &mdash; CareBridge AI{% endblock %}
+
+{% block content %}
+<div id="caregiver-announcer" class="sr-only" aria-live="polite" style="position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden;"></div>
+
+<!-- Header & Linked Senior Selector -->
+<section class="card" aria-labelledby="portal-title">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <span class="badge badge-info">CAREGIVER & FAMILY OVERSIGHT</span>
+      <h1 id="portal-title" style="margin-top: 0.5rem; margin-bottom: 0.25rem;">Caregiver Dashboard</h1>
+      <p style="margin-bottom: 0; font-size: 1.2rem;">
+        Logged in as: <strong>{{ current_user.full_name }}</strong> ({{ current_user.role | capitalize }})
+      </p>
+    </div>
+    <div>
+      <a href="/logout" class="btn btn-outline" style="min-height: 48px;">Sign Out</a>
+    </div>
+  </div>
+
+  <!-- Senior Selector -->
+  {% if links and (links | length) > 0 %}
+    <div style="margin-top: 1.5rem; padding-top: 1.25rem; border-top: 2px solid var(--border);">
+      <label for="senior-select" style="font-weight: 700; font-size: 1.15rem; margin-right: 0.75rem;">
+        Care Recipient:
+      </label>
+      <select id="senior-select" class="form-control" style="max-width: 380px; display: inline-block;" onchange="switchSenior(this.value)">
+        {% for link in links %}
+          <option value="{{ link.senior.id }}" {% if selected_senior and selected_senior.id == link.senior.id %}selected{% endif %}>
+            {{ link.senior.full_name }} ({{ link.relationship_type | replace('_', ' ') | capitalize }})
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+  {% else %}
+    <div style="margin-top: 1.5rem; padding: 1rem; background-color: var(--warning-bg); border-radius: var(--radius); border: 2px solid var(--warning);">
+      <p style="margin-bottom: 0; color: #78350f; font-weight: 700;">
+        ⚠️ No seniors currently linked to your account. Ask your senior or administrator to link you.
+      </p>
+    </div>
+  {% endif %}
+</section>
+
+{% if selected_senior %}
+  <!-- Real Adherence KPI Grid -->
+  <div class="grid-3">
+    <div class="card" style="text-align: center;">
+      <h2 style="font-size: 1.4rem;">Adherence Rate</h2>
+      {% if stats and stats.total_doses > 0 %}
+        <div style="font-size: 3rem; font-weight: 800; color: var(--success);" aria-label="Adherence rate {{ stats.adherence_rate_percent }} percent">
+          {{ stats.adherence_rate_percent }}%
+        </div>
+        <p style="margin-bottom: 0;">{{ stats.taken_count }} of {{ stats.total_doses }} doses taken</p>
+      {% else %}
+        <div style="font-size: 2.2rem; font-weight: 800; color: var(--text-muted);">N/A</div>
+        <p style="margin-bottom: 0;">No dose records yet</p>
+      {% endif %}
+    </div>
+
+    <div class="card" style="text-align: center;">
+      <h2 style="font-size: 1.4rem;">Pending Doses</h2>
+      <div style="font-size: 3rem; font-weight: 800; color: var(--primary);">
+        {{ stats.pending_count if stats else 0 }}
+      </div>
+      <p style="margin-bottom: 0;">Awaiting confirmation today</p>
+    </div>
+
+    <div class="card" style="text-align: center;">
+      <h2 style="font-size: 1.4rem;">Missed Alerts</h2>
+      <div style="font-size: 3rem; font-weight: 800; color: var(--danger);">
+        {{ stats.missed_count if stats else 0 }}
+      </div>
+      <p style="margin-bottom: 0;">Recorded missed doses</p>
+    </div>
+  </div>
+
+  <!-- Quick Action Accordion / Form Toggles -->
+  <div style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;">
+    <button class="btn btn-primary" onclick="toggleSection('add-med-form')">
+      ➕ Add Medication
+    </button>
+    <button class="btn btn-primary" onclick="toggleSection('add-appt-form')">
+      🗓️ Schedule Doctor Visit
+    </button>
+    <button class="btn btn-outline" onclick="toggleSection('edit-profile-form')">
+      ✏️ Update Health Profile
+    </button>
+  </div>
+
+  <!-- Form 1: Add Medication (Functional) -->
+  <section id="add-med-form" class="card" style="display: none; border-color: var(--primary);">
+    <h2>Add New Prescribed Medication</h2>
+    <form onsubmit="submitNewMedication(event)">
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="med-name">Medication Name *</label>
+          <input type="text" id="med-name" class="form-control" required placeholder="e.g. Lisinopril">
+        </div>
+        <div class="form-group">
+          <label for="med-dosage">Dosage *</label>
+          <input type="text" id="med-dosage" class="form-control" required placeholder="e.g. 10 mg (1 tablet)">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="med-time">Scheduled Time (24h HH:MM) *</label>
+          <input type="text" id="med-time" class="form-control" pattern="^\d{2}:\d{2}$" required placeholder="e.g. 08:30">
+        </div>
+        <div class="form-group">
+          <label for="med-purpose">Purpose / Condition</label>
+          <input type="text" id="med-purpose" class="form-control" placeholder="e.g. Blood pressure regulation">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="med-instructions">Instructions for Patient</label>
+        <textarea id="med-instructions" class="form-control" rows="2" placeholder="e.g. Take with a glass of water after breakfast"></textarea>
+      </div>
+      <div style="display: flex; gap: 1rem;">
+        <button type="submit" class="btn btn-success">Save Medication</button>
+        <button type="button" class="btn btn-outline" onclick="toggleSection('add-med-form')">Cancel</button>
+      </div>
+      <div id="med-form-msg" style="margin-top: 1rem; font-weight: 700;"></div>
+    </form>
+  </section>
+
+  <!-- Form 2: Schedule Doctor Visit (Functional) -->
+  <section id="add-appt-form" class="card" style="display: none; border-color: var(--primary);">
+    <h2>Schedule Doctor Appointment</h2>
+    <form onsubmit="submitNewAppointment(event)">
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="appt-doctor">Doctor Name *</label>
+          <input type="text" id="appt-doctor" class="form-control" required placeholder="e.g. Dr. Robert Anderson">
+        </div>
+        <div class="form-group">
+          <label for="appt-specialty">Specialty</label>
+          <input type="text" id="appt-specialty" class="form-control" placeholder="e.g. Cardiology">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="appt-datetime">Appointment Date & Time *</label>
+          <input type="datetime-local" id="appt-datetime" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label for="appt-clinic">Clinic / Hospital Name</label>
+          <input type="text" id="appt-clinic" class="form-control" placeholder="e.g. Community Medical Center">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="appt-prep">Preparation Instructions</label>
+        <input type="text" id="appt-prep" class="form-control" placeholder="e.g. Fasting 8 hours prior for blood tests">
+      </div>
+      <div style="display: flex; gap: 1rem;">
+        <button type="submit" class="btn btn-success">Save Appointment</button>
+        <button type="button" class="btn btn-outline" onclick="toggleSection('add-appt-form')">Cancel</button>
+      </div>
+      <div id="appt-form-msg" style="margin-top: 1rem; font-weight: 700;"></div>
+    </form>
+  </section>
+
+  <!-- Form 3: Update Profile (Functional) -->
+  <section id="edit-profile-form" class="card" style="display: none; border-color: var(--primary);">
+    <h2>Update Healthcare Profile</h2>
+    <form onsubmit="submitProfileUpdate(event)">
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="prof-blood">Blood Group</label>
+          <input type="text" id="prof-blood" class="form-control" value="{{ profile.blood_group if profile and profile.blood_group else '' }}" placeholder="e.g. O+">
+        </div>
+        <div class="form-group">
+          <label for="prof-allergies">Known Allergies</label>
+          <input type="text" id="prof-allergies" class="form-control" value="{{ profile.known_allergies if profile and profile.known_allergies else '' }}" placeholder="e.g. Penicillin, Peanuts">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="prof-conditions">Chronic Conditions</label>
+          <input type="text" id="prof-conditions" class="form-control" value="{{ profile.chronic_conditions if profile and profile.chronic_conditions else '' }}" placeholder="e.g. Hypertension">
+        </div>
+        <div class="form-group">
+          <label for="prof-mobility">Mobility / Assistance Notes</label>
+          <input type="text" id="prof-mobility" class="form-control" value="{{ profile.mobility_notes if profile and profile.mobility_notes else '' }}" placeholder="e.g. Uses walking cane">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="prof-ec-name">Emergency Contact Name</label>
+          <input type="text" id="prof-ec-name" class="form-control" value="{{ profile.emergency_contact_name if profile and profile.emergency_contact_name else '' }}" placeholder="e.g. Sarah Davies">
+        </div>
+        <div class="form-group">
+          <label for="prof-ec-phone">Emergency Contact Phone</label>
+          <input type="text" id="prof-ec-phone" class="form-control" value="{{ profile.emergency_contact_phone if profile and profile.emergency_contact_phone else '' }}" placeholder="e.g. 555-0144">
+        </div>
+      </div>
+      <div style="display: flex; gap: 1rem;">
+        <button type="submit" class="btn btn-success">Update Profile</button>
+        <button type="button" class="btn btn-outline" onclick="toggleSection('edit-profile-form')">Cancel</button>
+      </div>
+      <div id="prof-form-msg" style="margin-top: 1rem; font-weight: 700;"></div>
+    </form>
+  </section>
+
+  <!-- Data Display Grid -->
+  <div class="grid-2">
+    <!-- Active Medications List -->
+    <section class="card" aria-labelledby="meds-heading">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 id="meds-heading" style="margin-bottom: 0;">💊 Prescribed Medications</h2>
+        <span class="badge badge-info">{{ medications | length }} Registered</span>
+      </div>
+
+      {% if medications and (medications | length) > 0 %}
+        <div style="border-top: 2px solid var(--border); padding-top: 1rem;">
+          {% for med in medications %}
+            <div style="margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border);">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                  <strong style="font-size: 1.3rem;">{{ med.name }}</strong> &bull; {{ med.dosage }}
+                  {% if med.purpose %}
+                    <div style="color: var(--text-muted); font-size: 1.05rem;">Purpose: {{ med.purpose }}</div>
+                  {% endif %}
+                  {% if med.instructions %}
+                    <div style="color: var(--text-muted); font-size: 1.05rem;">📝 {{ med.instructions }}</div>
+                  {% endif %}
+                  <div style="margin-top: 0.5rem;">
+                    {% for sch in med.schedules %}
+                      <span class="badge badge-info" style="font-size: 0.9rem;">⏰ {{ sch.scheduled_time }} ({{ sch.days_of_week }})</span>
+                    {% endfor %}
+                  </div>
+                </div>
+                <div>
+                  {% if med.is_active %}
+                    <button class="btn btn-outline" style="padding: 0.4rem 0.8rem; font-size: 0.95rem; min-height: 40px; color: var(--danger); border-color: var(--danger);" onclick="deactivateMed({{ med.id }})">
+                      Deactivate
+                    </button>
+                  {% else %}
+                    <span class="badge badge-warning">Inactive</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p style="color: var(--text-muted); margin-bottom: 0;">No medications configured yet. Use "Add Medication" above.</p>
+      {% endif %}
+    </section>
+
+    <!-- Shared Healthcare Profile Display -->
+    <section class="card" aria-labelledby="profile-heading">
+      <h2 id="profile-heading">📋 Shared Healthcare Profile</h2>
+      {% if profile %}
+        <ul style="list-style: none; padding: 0; line-height: 2.1;">
+          <li><strong>Blood Group:</strong> {{ profile.blood_group or "Not specified" }}</li>
+          <li><strong>Known Allergies:</strong> {{ profile.known_allergies or "None recorded" }}</li>
+          <li><strong>Chronic Conditions:</strong> {{ profile.chronic_conditions or "None recorded" }}</li>
+          <li><strong>Mobility:</strong> {{ profile.mobility_notes or "Unrestricted" }}</li>
+          <li><strong>Primary Physician:</strong> {{ profile.primary_physician_name or "Not assigned" }}</li>
+          <li><strong>Emergency Contact:</strong> {{ profile.emergency_contact_name or "Not registered" }} {% if profile.emergency_contact_phone %}({{ profile.emergency_contact_phone }}){% endif %}</li>
+        </ul>
+      {% else %}
+        <p style="color: var(--text-muted); margin-bottom: 0;">No profile data available.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <!-- Appointments Section -->
+  <section class="card" aria-labelledby="appointments-heading">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+      <h2 id="appointments-heading" style="margin-bottom: 0;">🗓️ Doctor Appointments & Reminders</h2>
+      <span class="badge badge-info">{{ appointments | length }} Scheduled</span>
+    </div>
+
+    {% if appointments and (appointments | length) > 0 %}
+      <div style="display: grid; gap: 1rem;">
+        {% for appt in appointments %}
+          <div style="padding: 1.25rem; border: 2px solid var(--border); border-radius: var(--radius); background-color: var(--bg-primary);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+              <div>
+                <h3 style="font-size: 1.3rem;">Dr. {{ appt.doctor_name }}{% if appt.specialty %} &bull; {{ appt.specialty }}{% endif %}</h3>
+                <p style="margin-bottom: 0.25rem;">
+                  Time: <strong>{{ appt.appointment_datetime.strftime('%b %d, %Y at %I:%M %p') }}</strong>
+                </p>
+                {% if appt.clinic_name %}
+                  <p style="margin-bottom: 0.25rem;">Location: {{ appt.clinic_name }}</p>
+                {% endif %}
+                {% if appt.preparation_instructions %}
+                  <p style="margin-bottom: 0; color: var(--warning); font-weight: 700;">Prep: {{ appt.preparation_instructions }}</p>
+                {% endif %}
+              </div>
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <span class="badge badge-{{ 'success' if appt.status == 'scheduled' else 'warning' }}">{{ appt.status | capitalize }}</span>
+                {% if appt.status == 'scheduled' %}
+                  <button class="btn btn-outline" style="padding: 0.4rem 0.8rem; font-size: 0.95rem; min-height: 40px; color: var(--danger); border-color: var(--danger);" onclick="cancelAppointment({{ appt.id }})">
+                    Cancel
+                  </button>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p style="color: var(--text-muted); margin-bottom: 0;">No doctor visits scheduled. Use "Schedule Doctor Visit" above.</p>
+    {% endif %}
+  </section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const selectedSeniorId = {{ selected_senior.id if selected_senior else 'null' }};
+
+function switchSenior(seniorId) {
+  window.location.href = '/caregiver?senior_id=' + seniorId;
+}
+
+function toggleSection(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
+async function submitNewMedication(e) {
+  e.preventDefault();
+  const msgEl = document.getElementById('med-form-msg');
+  msgEl.innerHTML = '<span style="color: var(--primary);">Saving medication...</span>';
+
+  const body = {
+    name: document.getElementById('med-name').value,
+    dosage: document.getElementById('med-dosage').value,
+    instructions: document.getElementById('med-instructions').value,
+    purpose: document.getElementById('med-purpose').value,
+    schedules: [
+      { scheduled_time: document.getElementById('med-time').value, days_of_week: 'everyday', timezone: 'UTC' }
+    ]
+  };
+
+  try {
+    const res = await fetch('/api/medications?senior_id=' + selectedSeniorId, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      msgEl.innerHTML = '<span style="color: var(--success);">Medication added! Reloading...</span>';
+      setTimeout(() => location.reload(), 700);
+    } else {
+      const err = await res.json();
+      msgEl.innerHTML = '<span style="color: var(--danger);">' + (err.detail || 'Failed to add medication') + '</span>';
+    }
+  } catch (err) {
+    msgEl.innerHTML = '<span style="color: var(--danger);">Network error. Try again.</span>';
+  }
+}
+
+async function submitNewAppointment(e) {
+  e.preventDefault();
+  const msgEl = document.getElementById('appt-form-msg');
+  msgEl.innerHTML = '<span style="color: var(--primary);">Scheduling appointment...</span>';
+
+  const body = {
+    senior_id: selectedSeniorId,
+    doctor_name: document.getElementById('appt-doctor').value,
+    specialty: document.getElementById('appt-specialty').value,
+    appointment_datetime: new Date(document.getElementById('appt-datetime').value).toISOString(),
+    clinic_name: document.getElementById('appt-clinic').value,
+    preparation_instructions: document.getElementById('appt-prep').value
+  };
+
+  try {
+    const res = await fetch('/api/appointments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      msgEl.innerHTML = '<span style="color: var(--success);">Appointment scheduled! Reloading...</span>';
+      setTimeout(() => location.reload(), 700);
+    } else {
+      const err = await res.json();
+      msgEl.innerHTML = '<span style="color: var(--danger);">' + (err.detail || 'Failed to schedule appointment') + '</span>';
+    }
+  } catch (err) {
+    msgEl.innerHTML = '<span style="color: var(--danger);">Network error. Try again.</span>';
+  }
+}
+
+async function submitProfileUpdate(e) {
+  e.preventDefault();
+  const msgEl = document.getElementById('prof-form-msg');
+  msgEl.innerHTML = '<span style="color: var(--primary);">Updating profile...</span>';
+
+  const body = {
+    blood_group: document.getElementById('prof-blood').value,
+    known_allergies: document.getElementById('prof-allergies').value,
+    chronic_conditions: document.getElementById('prof-conditions').value,
+    mobility_notes: document.getElementById('prof-mobility').value,
+    emergency_contact_name: document.getElementById('prof-ec-name').value,
+    emergency_contact_phone: document.getElementById('prof-ec-phone').value
+  };
+
+  try {
+    const res = await fetch('/api/profile/' + selectedSeniorId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      msgEl.innerHTML = '<span style="color: var(--success);">Profile updated! Reloading...</span>';
+      setTimeout(() => location.reload(), 700);
+    } else {
+      const err = await res.json();
+      msgEl.innerHTML = '<span style="color: var(--danger);">' + (err.detail || 'Failed to update profile') + '</span>';
+    }
+  } catch (err) {
+    msgEl.innerHTML = '<span style="color: var(--danger);">Network error. Try again.</span>';
+  }
+}
+
+async function deactivateMed(medId) {
+  if (!confirm('Are you sure you want to deactivate this medication?')) return;
+  try {
+    const res = await fetch('/api/medications/' + medId + '/deactivate', { method: 'POST' });
+    if (res.ok) location.reload();
+  } catch (err) {
+    alert('Failed to deactivate medication.');
+  }
+}
+
+async function cancelAppointment(apptId) {
+  if (!confirm('Are you sure you want to cancel this appointment?')) return;
+  try {
+    const res = await fetch('/api/appointments/' + apptId + '/cancel', { method: 'POST' });
+    if (res.ok) location.reload();
+  } catch (err) {
+    alert('Failed to cancel appointment.');
+  }
+}
+</script>
+{% endblock %}

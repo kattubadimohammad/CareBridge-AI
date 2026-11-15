@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}Senior Dashboard &mdash; CareBridge AI{% endblock %}
+
+{% block content %}
+<div id="status-announcer" class="sr-only" aria-live="polite" style="position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden;"></div>
+
+<!-- Header Greeting & Live Clock -->
+<section class="card" aria-labelledby="senior-header" style="background-color: #eff6ff; border-color: var(--primary);">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <span class="badge badge-info" style="font-size: 1.1rem;">SENIOR EASY VIEW</span>
+      <h1 id="senior-header" style="font-size: 2.5rem; margin-top: 0.5rem;">
+        Hello, {{ senior.full_name if senior else "Friend" }}!
+      </h1>
+      <p style="font-size: 1.3rem; margin-bottom: 0;">Here is your personal care plan for today.</p>
+    </div>
+    <div style="font-size: 2rem; font-weight: 800; color: var(--primary);" aria-live="polite">
+      🕒 <span id="live-clock">--:--:--</span>
+    </div>
+  </div>
+</section>
+
+<!-- Emergency Contact Banner (Real Profile Data) -->
+<section class="card" style="border: 3px solid var(--danger); background-color: var(--danger-bg);" aria-labelledby="emergency-heading">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h2 id="emergency-heading" style="color: var(--danger); font-size: 1.8rem; margin-bottom: 0.25rem;">
+        🚨 Emergency Assistance
+      </h2>
+      {% if profile and profile.emergency_contact_phone %}
+        <p style="font-size: 1.25rem; color: #7f1d1d; margin-bottom: 0;">
+          Contact: <strong>{{ profile.emergency_contact_name or "Emergency Contact" }}</strong>
+          {% if profile.emergency_contact_relation %} ({{ profile.emergency_contact_relation }}){% endif %}
+          &bull; Phone: <strong>{{ profile.emergency_contact_phone }}</strong>
+        </p>
+      {% else %}
+        <p style="font-size: 1.25rem; color: #7f1d1d; margin-bottom: 0;">
+          Emergency contact is not configured yet. Please ask your caregiver or family to add your primary emergency contact.
+        </p>
+      {% endif %}
+    </div>
+    {% if profile and profile.emergency_contact_phone %}
+      <a href="tel:{{ profile.emergency_contact_phone }}" class="btn btn-danger btn-mega" aria-label="Call Emergency Contact">
+        📞 CALL NOW
+      </a>
+    {% else %}
+      <span class="badge badge-warning" style="font-size: 1.1rem; padding: 0.75rem 1.25rem;">
+        ⚠️ Not Configured
+      </span>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Today's Medication Doses (Dynamic Real Data) -->
+<section aria-labelledby="schedule-heading">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <h2 id="schedule-heading" style="font-size: 2.2rem; margin-bottom: 0;">
+      💊 Today's Medication Schedule
+    </h2>
+    <span class="badge badge-info" style="font-size: 1.1rem;">
+      {{ doses | length }} Scheduled Dose{{ 's' if (doses | length) != 1 else '' }}
+    </span>
+  </div>
+
+  <div id="doses-container">
+    {% if doses and (doses | length) > 0 %}
+      {% for dose in doses %}
+        <div class="dose-card {{ dose.status }}" id="dose-card-{{ dose.id }}">
+          <div class="dose-info">
+            <div class="time-tag">
+              ⏰ {{ dose.scheduled_for.strftime('%I:%M %p') }}
+            </div>
+            <h3>{{ dose.medication_name }}</h3>
+            <div style="font-size: 1.3rem; font-weight: 700;">Dosage: {{ dose.dosage }}</div>
+            {% if dose.notes %}
+              <div class="instructions">📝 Notes: {{ dose.notes }}</div>
+            {% endif %}
+          </div>
+          
+          <div id="actions-{{ dose.id }}" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+            {% if dose.status == 'pending' %}
+              <button class="btn btn-success btn-mega" onclick="confirmDose({{ dose.id }}, 'taken')" aria-label="Confirm {{ dose.medication_name }} Taken">
+                ✅ I TOOK THIS
+              </button>
+              <button class="btn btn-outline" onclick="confirmDose({{ dose.id }}, 'skipped')" aria-label="Skip {{ dose.medication_name }}">
+                Skip Dose
+              </button>
+            {% elif dose.status == 'taken' %}
+              <span class="badge badge-success" style="font-size: 1.4rem; padding: 0.75rem 1.5rem;">
+                🎉 TAKEN{% if dose.taken_at %} at {{ dose.taken_at.strftime('%I:%M %p') }}{% endif %}
+              </span>
+            {% elif dose.status == 'skipped' %}
+              <span class="badge badge-warning" style="font-size: 1.3rem; padding: 0.6rem 1.2rem;">
+                ⏭️ SKIPPED
+              </span>
+            {% elif dose.status == 'missed' %}
+              <span class="badge badge-danger" style="font-size: 1.3rem; padding: 0.6rem 1.2rem;">
+                ⚠️ MISSED
+              </span>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="card" style="text-align: center; padding: 3rem 1.5rem;">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">🎉</div>
+        <h3 style="font-size: 1.8rem; margin-bottom: 0.5rem;">All Caught Up!</h3>
+        <p style="font-size: 1.25rem; color: var(--text-muted); margin-bottom: 0;">
+          You have no pending medications scheduled for today. Rest well!
+        </p>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Upcoming Doctor Appointments (Dynamic Real Data) -->
+<section class="card" aria-labelledby="appt-heading" style="margin-top: 2rem;">
+  <h2 id="appt-heading" style="font-size: 1.8rem; margin-bottom: 1rem;">🗓️ Upcoming Doctor Visits</h2>
+  {% if appointments and (appointments | length) > 0 %}
+    {% for appt in appointments %}
+      <div style="padding: 1.25rem; border: 2px solid var(--border); border-radius: var(--radius); margin-bottom: 1rem; background-color: var(--bg-primary);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+          <div>
+            <h3 style="font-size: 1.4rem;">Dr. {{ appt.doctor_name }}{% if appt.specialty %} ({{ appt.specialty }}){% endif %}</h3>
+            <p style="margin-bottom: 0.25rem;">
+              Date & Time: <strong>{{ appt.appointment_datetime.strftime('%A, %b %d, %Y at %I:%M %p') }}</strong>
+            </p>
+            {% if appt.clinic_name or appt.clinic_address %}
+              <p style="margin-bottom: 0.25rem;">
+                Clinic: {{ appt.clinic_name }}{% if appt.clinic_address %} &bull; {{ appt.clinic_address }}{% endif %}
+              </p>
+            {% endif %}
+            {% if appt.preparation_instructions %}
+              <p style="margin-bottom: 0; color: var(--warning); font-weight: 700;">
+                ⚠️ Preparation: {{ appt.preparation_instructions }}
+              </p>
+            {% endif %}
+          </div>
+          <div>
+            <span class="badge badge-info">{{ appt.status | capitalize }}</span>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p style="font-size: 1.2rem; color: var(--text-muted); margin-bottom: 0;">
+      No upcoming doctor visits scheduled.
+    </p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function confirmDose(logId, action) {
+  const actionsContainer = document.getElementById('actions-' + logId);
+  const card = document.getElementById('dose-card-' + logId);
+  const announcer = document.getElementById('status-announcer');
+
+  if (actionsContainer) {
+    actionsContainer.innerHTML = '<span style="font-size: 1.2rem; font-weight: 700; color: var(--primary);">Saving...</span>';
+  }
+
+  try {
+    const res = await fetch('/api/adherence/logs/' + logId + '/confirm', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: action, notes: 'Confirmed from Senior Dashboard' })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (action === 'taken') {
+        card.className = 'dose-card taken';
+        actionsContainer.innerHTML = '<span class="badge badge-success" style="font-size: 1.4rem; padding: 0.75rem 1.5rem;">🎉 TAKEN</span>';
+        if (announcer) announcer.textContent = 'Dose marked as taken successfully.';
+      } else {
+        card.className = 'dose-card skipped';
+        actionsContainer.innerHTML = '<span class="badge badge-warning" style="font-size: 1.3rem; padding: 0.6rem 1.2rem;">⏭️ SKIPPED</span>';
+        if (announcer) announcer.textContent = 'Dose marked as skipped.';
+      }
+    } else {
+      const err = await res.json();
+      actionsContainer.innerHTML = '<span style="color: var(--danger); font-weight: 700;">' + (err.detail || 'Error updating dose') + '</span>';
+      if (announcer) announcer.textContent = 'Failed to confirm dose.';
+    }
+  } catch (err) {
+    actionsContainer.innerHTML = '<span style="color: var(--danger); font-weight: 700;">Connection failed. Try again.</span>';
+    if (announcer) announcer.textContent = 'Network connection failed.';
+  }
+}
+</script>
+{% endblock %}

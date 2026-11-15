@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In &mdash; CareBridge AI{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 0 auto;">
+  <section class="card" aria-labelledby="signin-title">
+    <h1 id="signin-title" style="text-align: center; margin-bottom: 1.5rem;">Access CareBridge AI</h1>
+
+    <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+      <button id="tab-senior" class="btn btn-primary" style="flex: 1;" onclick="switchTab('senior')" aria-label="Switch to Senior PIN Login">
+        👴 Senior PIN Login
+      </button>
+      <button id="tab-caregiver" class="btn btn-outline" style="flex: 1;" onclick="switchTab('caregiver')" aria-label="Switch to Caregiver and Family Login">
+        👩‍⚕️ Caregiver / Family
+      </button>
+    </div>
+
+    <!-- Senior Numeric Passcode Form -->
+    <div id="senior-section" aria-label="Senior Passcode Entry Section">
+      <div class="form-group">
+        <label for="senior-id-input">Senior Patient ID:</label>
+        <input type="number" id="senior-id-input" class="form-control" placeholder="Enter your ID number" style="font-size: 1.5rem; text-align: center;" required>
+      </div>
+
+      <div class="form-group">
+        <label for="passcode-display">Your Passcode PIN:</label>
+        <input type="password" id="passcode-display" class="form-control" readonly placeholder="Enter digits using keypad" style="font-size: 2rem; letter-spacing: 0.5rem; text-align: center; font-weight: 800;" aria-label="Passcode digits entered">
+      </div>
+
+      <!-- Numeric Keypad -->
+      <div class="keypad" aria-label="Numeric Passcode Keypad">
+        <button type="button" class="keypad-btn" onclick="pressKey('1')" aria-label="Digit 1">1</button>
+        <button type="button" class="keypad-btn" onclick="pressKey('2')" aria-label="Digit 2">2</button>
+        <button type="button" class="keypad-btn" onclick="pressKey('3')" aria-label="Digit 3">3</button>
+        <button type="button" class="keypad-btn" onclick="pressKey('4')" aria-label="Digit 4">4</button>
+        <button type="button" class="keypad-btn" onclick="pressKey('5')" aria-label="Digit 5">5</button>
+        <button type="button" class="keypad-btn" onclick="pressKey('6')" aria-label="Digit 6">6</button>
+        <button type="button" class="keypad-btn" onclick="pressKey('7')" aria-label="Digit 7">7</button>
+        <button type="button" class="keypad-btn" onclick="pressKey('8')" aria-label="Digit 8">8</button>
+        <button type="button" class="keypad-btn" onclick="pressKey('9')" aria-label="Digit 9">9</button>
+        <button type="button" class="keypad-btn" style="color: var(--danger);" onclick="clearPin()" aria-label="Clear Passcode">Clear</button>
+        <button type="button" class="keypad-btn" onclick="pressKey('0')" aria-label="Digit 0">0</button>
+        <button type="button" class="keypad-btn" style="color: var(--success);" onclick="submitSeniorLogin()" aria-label="Submit Login">Go ➔</button>
+      </div>
+
+      <div id="senior-msg" style="margin-top: 1rem; text-align: center; font-weight: 700; font-size: 1.2rem;" aria-live="polite"></div>
+    </div>
+
+    <!-- Caregiver Email/Password Form -->
+    <div id="caregiver-section" style="display: none;" aria-label="Caregiver Login Section">
+      <form onsubmit="handleCaregiverLogin(event)">
+        <div class="form-group">
+          <label for="cg-email">Email Address:</label>
+          <input type="email" id="cg-email" class="form-control" required placeholder="name@example.com">
+        </div>
+        <div class="form-group">
+          <label for="cg-password">Password:</label>
+          <input type="password" id="cg-password" class="form-control" required placeholder="Enter your password">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; font-size: 1.3rem;">
+          Sign In to Caregiver Portal
+        </button>
+      </form>
+      <div id="caregiver-msg" style="margin-top: 1rem; text-align: center; font-weight: 700; font-size: 1.2rem;" aria-live="polite"></div>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPin = '';
+
+function switchTab(tab) {
+  const seniorSec = document.getElementById('senior-section');
+  const caregiverSec = document.getElementById('caregiver-section');
+  const tabSenior = document.getElementById('tab-senior');
+  const tabCaregiver = document.getElementById('tab-caregiver');
+
+  if (tab === 'senior') {
+    seniorSec.style.display = 'block';
+    caregiverSec.style.display = 'none';
+    tabSenior.className = 'btn btn-primary';
+    tabCaregiver.className = 'btn btn-outline';
+  } else {
+    seniorSec.style.display = 'none';
+    caregiverSec.style.display = 'block';
+    tabSenior.className = 'btn btn-outline';
+    tabCaregiver.className = 'btn btn-primary';
+  }
+}
+
+function pressKey(num) {
+  if (currentPin.length < 8) {
+    currentPin += num;
+    document.getElementById('passcode-display').value = currentPin;
+  }
+}
+
+function clearPin() {
+  currentPin = '';
+  document.getElementById('passcode-display').value = '';
+  document.getElementById('senior-msg').innerHTML = '';
+}
+
+async function submitSeniorLogin() {
+  const seniorId = document.getElementById('senior-id-input').value;
+  const msgEl = document.getElementById('senior-msg');
+  if (!seniorId || !currentPin) {
+    msgEl.innerHTML = '<span style="color: var(--danger);">Please enter your Patient ID and tap your Passcode PIN.</span>';
+    return;
+  }
+
+  msgEl.innerHTML = '<span style="color: var(--primary);">Validating passcode...</span>';
+
+  try {
+    const res = await fetch('/api/auth/login-passcode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: parseInt(seniorId), passcode: currentPin })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msgEl.innerHTML = '<span style="color: var(--success);">Login Successful! Opening your dashboard...</span>';
+      setTimeout(() => { window.location.href = '/senior'; }, 600);
+    } else {
+      msgEl.innerHTML = `<span style="color: var(--danger);">${data.detail || 'Incorrect ID or Passcode.'}</span>`;
+      clearPin();
+    }
+  } catch (err) {
+    msgEl.innerHTML = '<span style="color: var(--danger);">Network error. Please try again.</span>';
+  }
+}
+
+async function handleCaregiverLogin(e) {
+  e.preventDefault();
+  const email = document.getElementById('cg-email').value;
+  const password = document.getElementById('cg-password').value;
+  const msgEl = document.getElementById('caregiver-msg');
+
+  msgEl.innerHTML = '<span style="color: var(--primary);">Authenticating...</span>';
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msgEl.innerHTML = '<span style="color: var(--success);">Welcome back! Opening portal...</span>';
+      setTimeout(() => { window.location.href = '/caregiver'; }, 600);
+    } else {
+      msgEl.innerHTML = `<span style="color: var(--danger);">${data.detail || 'Login failed.'}</span>`;
+    }
+  } catch (err) {
+    msgEl.innerHTML = '<span style="color: var(--danger);">Network error. Please try again.</span>';
+  }
+}
+</script>
+{% endblock %}

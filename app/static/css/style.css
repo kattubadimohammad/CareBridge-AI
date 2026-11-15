@@ -1,0 +1,343 @@
+/* CareBridge AI - Accessible & Senior-Friendly Design System */
+
+:root {
+  --bg-primary: #f8fafc;
+  --bg-surface: #ffffff;
+  --text-main: #0f172a;      /* High contrast charcoal */
+  --text-muted: #334155;     /* WCAG AA compliant contrast */
+  --primary: #1d4ed8;        /* Accessible blue */
+  --primary-hover: #1e40af;
+  --primary-contrast: #ffffff;
+  --success: #15803d;        /* Accessible dark green */
+  --success-bg: #dcfce7;
+  --warning: #b45309;        /* Accessible amber */
+  --warning-bg: #fef3c7;
+  --danger: #b91c1c;         /* Accessible red */
+  --danger-bg: #fee2e2;
+  --border: #cbd5e1;
+  --border-strong: #94a3b8;
+  --focus-ring: #0284c7;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --font-base: 18px;         /* Minimum readable baseline */
+  --font-senior: 22px;       /* Extra large font for senior mode */
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: var(--font-base);
+  line-height: 1.6;
+  color: var(--text-main);
+  background-color: var(--bg-primary);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header & Navigation */
+.navbar {
+  background-color: var(--bg-surface);
+  border-bottom: 2px solid var(--border);
+  padding: 1.25rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.brand {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--primary);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-links {
+  display: flex;
+  gap: 1rem;
+  list-style: none;
+  flex-wrap: wrap;
+}
+
+.nav-links a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 700;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius);
+  border: 2px solid transparent;
+}
+
+.nav-links a:hover,
+.nav-links a:focus-visible {
+  color: var(--primary);
+  background-color: #eff6ff;
+  border-color: var(--primary);
+  outline: 3px solid var(--focus-ring);
+}
+
+/* Main Container */
+.main-container {
+  max-width: 1100px;
+  margin: 2rem auto;
+  padding: 0 1.5rem;
+  flex: 1;
+  width: 100%;
+}
+
+/* Cards & Sections */
+.card {
+  background-color: var(--bg-surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.card h1 {
+  font-size: 2.2rem;
+  margin-bottom: 1rem;
+  color: var(--text-main);
+}
+
+.card h2 {
+  font-size: 1.7rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-main);
+}
+
+.card p {
+  color: var(--text-muted);
+  font-size: 1.15rem;
+  margin-bottom: 1.25rem;
+}
+
+/* Senior High-Contrast Dose Cards */
+.dose-card {
+  border: 3px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  background-color: #ffffff;
+}
+
+.dose-card.pending {
+  border-left: 10px solid var(--warning);
+  background-color: #fffdf5;
+}
+
+.dose-card.taken {
+  border-left: 10px solid var(--success);
+  background-color: #f7fee7;
+}
+
+.dose-card.missed {
+  border-left: 10px solid var(--danger);
+  background-color: #fff5f5;
+}
+
+.dose-info h3 {
+  font-size: 1.8rem;
+  color: var(--text-main);
+  margin-bottom: 0.3rem;
+}
+
+.dose-info .time-tag {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.dose-info .instructions {
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  margin-top: 0.4rem;
+}
+
+/* Senior Mega Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 800;
+  padding: 1rem 1.75rem;
+  min-height: 58px;         /* Accessible touch target */
+  border-radius: var(--radius);
+  border: 2px solid transparent;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  transition: all 0.15s ease-in-out;
+}
+
+.btn:focus-visible {
+  outline: 4px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  color: var(--primary-contrast);
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn-success {
+  background-color: var(--success);
+  color: #ffffff;
+}
+
+.btn-success:hover {
+  background-color: #166534;
+}
+
+.btn-warning {
+  background-color: var(--warning);
+  color: #ffffff;
+}
+
+.btn-danger {
+  background-color: var(--danger);
+  color: #ffffff;
+}
+
+.btn-outline {
+  background-color: transparent;
+  border-color: var(--border-strong);
+  color: var(--text-main);
+}
+
+.btn-outline:hover {
+  background-color: #f1f5f9;
+}
+
+.btn-mega {
+  font-size: 1.5rem;
+  padding: 1.25rem 2.5rem;
+  min-height: 68px;
+  border-radius: var(--radius-lg);
+}
+
+/* Status Badges */
+.badge {
+  display: inline-block;
+  padding: 0.4rem 0.85rem;
+  border-radius: 9999px;
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.badge-info {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.badge-success {
+  background-color: var(--success-bg);
+  color: var(--success);
+}
+
+.badge-warning {
+  background-color: var(--warning-bg);
+  color: var(--warning);
+}
+
+.badge-danger {
+  background-color: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* Keypad for Senior Passcode Login */
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  max-width: 320px;
+  margin: 1.5rem auto;
+}
+
+.keypad-btn {
+  font-size: 1.8rem;
+  font-weight: 800;
+  padding: 1rem;
+  height: 72px;
+  border-radius: var(--radius);
+  border: 2px solid var(--border-strong);
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.keypad-btn:hover {
+  background-color: #eff6ff;
+  border-color: var(--primary);
+}
+
+/* Form Controls */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 700;
+  font-size: 1.15rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-main);
+}
+
+.form-control {
+  width: 100%;
+  font-size: 1.2rem;
+  padding: 0.85rem 1rem;
+  border: 2px solid var(--border-strong);
+  border-radius: var(--radius);
+  background-color: #ffffff;
+}
+
+.form-control:focus {
+  outline: 3px solid var(--focus-ring);
+  border-color: var(--primary);
+}
+
+/* Grid Layouts */
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Footer */
+footer {
+  text-align: center;
+  padding: 2rem;
+  border-top: 2px solid var(--border);
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  background-color: var(--bg-surface);
+}

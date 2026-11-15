@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}CareBridge AI &mdash; Elderly Care & Medication Platform{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header>
+    <nav class="navbar" aria-label="Main Navigation">
+      <a href="/" class="brand" aria-label="CareBridge AI Home">
+        <span aria-hidden="true">💙</span> CareBridge AI
+      </a>
+      <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/senior">👴 Senior Mode</a></li>
+        <li><a href="/caregiver">👩‍⚕️ Caregiver Portal</a></li>
+        <li><a href="/login">🔐 Sign In</a></li>
+        <li><a href="/docs" target="_blank" rel="noopener">API Docs</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main-content" class="main-container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>
+    <p>&copy; 2026 CareBridge AI &mdash; Accessible Elderly Care & Medication Management Platform</p>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
